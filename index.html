@@ -1,0 +1,50 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>级联控件</title>
+    <link rel="stylesheet" href="./cascader.css" type="text/css">
+</head>
+
+<body>   
+    <div>
+		<h3>请点击下方输入框选择</h3>
+        <input type="text" id="test"/>
+    </div>
+    <script src="./jquery.min.js"></script>
+    <script src="./citys.js"></script>
+    <script src="./cascader.js"></script>
+    <script>
+        $(function(){
+          citys.forEach(function(item){
+            item.label = item.name
+            item.value = item.adcode
+            item.children = item.s
+            item.s.forEach(function(item2){
+              item2.label = item2.name
+              item2.value = item2.adcode
+              if (item2.s && item2.s.length) {
+                item2.children = item2.s
+                item2.s.forEach(function(item3){
+                  item3.label = item3.name
+                  item3.value = item3.adcode
+                })
+              }
+            })
+          })
+
+          $('#test').zdCascader({
+            data: citys,
+            container: '#test',
+            search: true,
+            onChange: function(value, label, datas){
+              console.log(value, label, datas);
+            }
+          });
+        })
+    </script>   
+</body>
+
+</html>
