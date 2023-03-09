@@ -24,6 +24,9 @@
                 this.$el = $(el); //input
                 this.$el_ = this.$el.clone();
 
+                this.$val_el = this.$el.clone().attr('id', this.$el.attr('id') + '_value')
+                this.$val_el.appendTo(this.$el);
+
                 this.init();
             }
             ZdCascader.CLASS = {
@@ -50,7 +53,9 @@
             ZdCascader.DEFAULTS = {
                 data: null, //支持格式[{value:"",label:"",children:[{value:"",label:""}]}]
                 range: ' / ', //分割符
-                onChange: function (data) {}
+                onChange: function (value, label, datas) {
+                }, //选中后的回调
+                initData: null, //初始化数据 parent > child [{value: "", label: ""}, {…}]
             }
 
             ZdCascader.METHODS = ['reload', 'destroy'];
@@ -60,16 +65,25 @@
                 this._construct();
                 /*事件绑定*/
                 this._event();
+                this._initFromData();
             }
 
+            ZdCascader.prototype._initFromData = function () {
+              const initData = this.options.initData;
+              if (initData&&initData.length>0) {
+                var label = initData.map((d) => d.label).join(this.options.range);
+                var value = initData.map((d) => d.value);
+                this.$el.val(label);
+                this.$val_el.val(value);
+                this.$el.data('persist_v', label);
+              }
+            };
 
             //构建Cascader的html
             ZdCascader.prototype._construct = function () {
-                var self = this;
                 //最外层容器
                 this.$container = this.$el.wrap(`<div class="${this.CLASS.wrap}"></div>`)
-                    .wrap(`<div class="${this.CLASS.inputwrap}"></div>`).addClass(this.CLASS.input).prop('readonly', !this.options.search).closest('.' + this.CLASS.wrap);
-
+                    .wrap(`<div class="${this.CLASS.inputwrap}"></div>`).addClass(this.CLASS.input).closest('.' + this.CLASS.wrap);
                 //文本框右侧图标
                 this.$arrow = $(`<span class="zd-input__suffix">
                                     <span class="zd-input__suffix-inner">
@@ -105,20 +119,28 @@
                     this.$container.removeClass(this.CLASS.checkClass.wrapFocus);
                 }, this));
 
+
+                this.$el.on('blur', $.proxy(function () {
+                    this.$el.val(this.$el.data('persist_v'))
+                }, this));
+
                 this.$container.on('click.item', '.' + this.CLASS.menuNode, $.proxy(this._nodeClick, this));
 
                 this.$el.on('keyup.wrap', $.proxy(this._keyup, this));
 
                 this.$el.on('input', $.proxy(function (event) {
-                  this.search(this.$el.val())
+                  if(this.options.search) this.search(this.$el.val());
+
+                  if(this.$el.val() == ''){
+                    this.$val_el.val('');
+                    this.$el.data('persist_v', '')
+                  }
                 }, this));
             }
             ZdCascader.prototype._wrapClick = function () {
                 event.stopPropagation();
                 this.$el.focus();
                 if (!this.$container.hasClass(this.CLASS.checkClass.wrapFocus)) {
-                    // if (this.$dropdownWrap.children(this.CLASS.menuWrap).length === 0)
-                    //     loadFirst();
                     this.$container.addClass(this.CLASS.checkClass.wrapFocus);
                 }
                 this.$dropdownWrap.find('li.' + this.CLASS.checkClass.nodeAnchor).removeClass(this.CLASS
@@ -131,24 +153,29 @@
                 var $wrap = $that.closest('.' + this.CLASS.menuWrap);
                 $that.addClass(this.CLASS.checkClass.menuNodeSelected).siblings().removeClass(this.CLASS.checkClass.menuNodeSelected);
                 var data = $that.data('bindData');
-                if (!data.children) {
+                if (!data.children || data.children.length === 0) {
                     $wrap.nextAll().remove();
                     var prevWrap = $wrap.prevAll();
-                    var value = data.label;
+                    var label = data.label;
+                    var value = [data.value];
                     var allPathData = [data];
                     $.each(prevWrap, (i, m) => {
                         var selectedData = $(m).find('li.' + this.CLASS.checkClass
-                            .menuNodeSelected).data(
-                            'bindData');
-                        value = selectedData.label + this.options.range + value;
+                            .menuNodeSelected).data('bindData');
+                        label = selectedData.label + this.options.range + label;
+                        value.push(selectedData.value);
                         allPathData.push(selectedData);
                     });
-                    this.$el.val(value).focus();
+                    this.$el.val(label).focus();
+                    this.$val_el.val(value);
+
                     this.$container.removeClass(this.CLASS.checkClass.wrapFocus);
                     this.$dropdownWrap.find('.' + this.CLASS.checkClass.nodeSelectedIcon).remove();
                     $that.prepend($(`<span class="${this.CLASS.checkClass.nodeSelectedIcon}">√</span>`));
                     this.$el.data('bindData', data);
                     this.$el.data('bindPathData', allPathData);
+                    this.$el.data('persist_v', label);
+
                     if (this.options.onChange && typeof this.options.onChange === "function")
                         this.options.onChange(this, data, allPathData);
                     event.stopPropagation();
@@ -163,7 +190,7 @@
                 this.$dropdownWrap.find('li.' + this.CLASS.checkClass.nodeAnchor).removeClass(this.CLASS
                     .checkClass.nodeAnchor);
                 $parentNode.addClass(this.CLASS.checkClass.nodeAnchor);
-                if (!data.children) {
+                if (!data.children || data.children.length === 0) {
                     $wrap.nextAll().remove();
                     return
                 }
@@ -219,7 +246,7 @@
             ZdCascader.prototype.getLabelList = function () {
               var datas = [];
               this.options.data.forEach(function(prov) {
-                if (prov.children) {
+                if (prov.children&&prov.children.length>0) {
                   prov.children.forEach(function(city) {
                     if (city.children) {
                       city.children.forEach(function(area) {
